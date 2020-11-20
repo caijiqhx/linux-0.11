@@ -28,7 +28,7 @@ begbss:
 .text
 
 entry start
-start:
+start:				; 加载机器系统信息到 0x90000 ~ 0x901FD
 
 ! ok, the read went well so we get current cursor position and save it for
 ! posterity.
@@ -39,6 +39,7 @@ start:
 	xor	bh,bh
 	int	0x10		! save it in known place, con_init fetches
 	mov	[0],dx		! it from 0x90000.
+
 ! Get memory size (extended mem, kB)
 
 	mov	ah,#0x88
@@ -103,23 +104,23 @@ no_disk1:
 	stosb
 is_disk1:
 
-! now we want to move to protected mode ...
+! now we want to move to protected mode ...	; 进入保护模式
 
 	cli			! no interrupts allowed !
 
 ! first we move the system to it's rightful place
 
 	mov	ax,#0x0000
-	cld			! 'direction'=0, movs moves forward
+	cld			! 'direction'=0, movs moves forward	; 指定内存方向，即从头开始复制
 do_move:
-	mov	es,ax		! destination segment
-	add	ax,#0x1000
-	cmp	ax,#0x9000
+	mov	es,ax		! destination segment	; 目的地址 es:si = 0x0000:0x0000
+	add	ax,#0x1000							; 一次移动 0x1000
+	cmp	ax,#0x9000							; 直到移动完成 0x10000 ~ 0x90000 的
 	jz	end_move
-	mov	ds,ax		! source segment
+	mov	ds,ax		! source segment		; 源地址 ds:di = 0x1000:0x0000
 	sub	di,di
 	sub	si,si
-	mov 	cx,#0x8000
+	mov 	cx,#0x8000						; 移动 0x8000 个 word = 0x10000 字节
 	rep
 	movsw
 	jmp	do_move
@@ -133,7 +134,7 @@ end_move:
 	lgdt	gdt_48		! load gdt with whatever appropriate
 
 ! that was painless, now we enable A20
-
+	; 通过设置键盘控制器的端口值打开 A20
 	call	empty_8042
 	mov	al,#0xD1		! command write
 	out	#0x64,al
@@ -152,10 +153,10 @@ end_move:
 
 	mov	al,#0x11		! initialization sequence
 	out	#0x20,al		! send it to 8259A-1
-	.word	0x00eb,0x00eb		! jmp $+2, jmp $+2
+	.word	0x00eb,0x00eb		! jmp $+2, jmp $+2 ; $ 表示当前指令地址
 	out	#0xA0,al		! and to 8259A-2
 	.word	0x00eb,0x00eb
-	mov	al,#0x20		! start of hardware int's (0x20)
+	mov	al,#0x20		! start of hardware int's (0x20) ; 硬件中断被设置成从 0x20 开始
 	out	#0x21,al
 	.word	0x00eb,0x00eb
 	mov	al,#0x28		! start of hardware int's 2 (0x28)
@@ -186,9 +187,10 @@ end_move:
 ! things as simple as possible, we do no register set-up or anything,
 ! we let the gnu-compiled 32-bit programs do that. We just jump to
 ! absolute address 0x00000, in 32-bit protected mode.
-	mov	ax,#0x0001	! protected mode (PE) bit
-	lmsw	ax		! This is it!
-	jmpi	0,8		! jmp offset 0 of segment 8 (cs)
+
+	mov	ax,#0x0001	! protected mode (PE) bit			; 保护模式置位
+	lmsw	ax		! This is it!						; 加载继器状态字 mov cr0, ax
+	jmpi	0,8		! jmp offset 0 of segment 8 (cs)	; 跳转至 cs(1000) 段偏移 0
 
 ! This routine checks that the keyboard command queue is empty
 ! No timeout is used - if this hangs there is something wrong with
@@ -219,7 +221,7 @@ idt_48:
 
 gdt_48:
 	.word	0x800		! gdt limit=2048, 256 GDT entries
-	.word	512+gdt,0x9	! gdt base = 0X9xxxx
+	.word	512+gdt,0x9	! gdt base = 0X9xxxx	; 即指向 setup 地址加上 gdt 在本段的偏移地址
 	
 .text
 endtext:

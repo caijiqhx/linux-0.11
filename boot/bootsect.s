@@ -42,35 +42,35 @@ ENDSEG   = SYSSEG + SYSSIZE		! where to stop loading
 !		0x301 - first partition on first drive etc
 ROOT_DEV = 0x306
 
-entry _start
-_start:
+entry start
+start:
 	mov	ax,#BOOTSEG
-	mov	ds,ax
+	mov	ds,ax					; ds 段寄存器置为 0x7c0
 	mov	ax,#INITSEG
-	mov	es,ax
-	mov	cx,#256
-	sub	si,si
-	sub	di,di
-	rep
-	movw
-	jmpi	go,INITSEG
-go:	mov	ax,cs
-	mov	ds,ax
+	mov	es,ax					; es 段寄存器置为 0x9000
+	mov	cx,#256					; 设置移动计数值 256 字
+	sub	si,si					; 源地址 ds:si = 0x07c0:0x0000
+	sub	di,di					; 目的地址 es:di = 0x9000:0x0000
+	rep							; 重复执行并递减 cx，知道 cx = 0
+	movw						; 从 [si] 处移动一个 word 到 [di] 处，配合 rep 就是把 256 个 word 复制到 INITSEG 处
+	jmpi	go,INITSEG			; 段间跳转，跳转到 INITSEG:go 处开始执行
+go:	mov	ax,cs					; 此处已经是在移动后的新位置 0x90000 处执行
+	mov	ds,ax					; 设置段寄存器和栈寄存器
 	mov	es,ax
 ! put stack at 0x9ff00.
-	mov	ss,ax
+	mov	ss,ax					;  cs = ds = es = ss = 0x9000 sp = 0xff00
 	mov	sp,#0xFF00		! arbitrary value >>512
 
 ! load the setup-sectors directly after the bootblock.
 ! Note that 'es' is already set up.
 
 load_setup:
-	mov	dx,#0x0000		! drive 0, head 0
-	mov	cx,#0x0002		! sector 2, track 0
-	mov	bx,#0x0200		! address = 512, in INITSEG
-	mov	ax,#0x0200+SETUPLEN	! service 2, nr of sectors
+	mov	dx,#0x0000		! drive 0, head 0				; dh = 磁头号 dl = 驱动器号 如果是硬盘则位 7 置位
+	mov	cx,#0x0002		! sector 2, track 0 			; ch = 磁道号的低 8 位 cl = 0-5 位 开始扇区 6-7 位磁道号高 2 位
+	mov	bx,#0x0200		! address = 512, in INITSEG		; es:bx 指向数据缓冲区 如果出错则 CF 置位，ah 是出错码
+	mov	ax,#0x0200+SETUPLEN	! service 2, nr of sectors	; ah = 0x02 表示读扇区到内存 al = 要读的扇区数量
 	int	0x13			! read it
-	jnc	ok_load_setup		! ok - continue
+	jnc	ok_load_setup		! ok - continue 			; CF 未置位即成功加载
 	mov	dx,#0x0000
 	mov	ax,#0x0000		! reset the diskette
 	int	0x13
@@ -97,7 +97,7 @@ ok_load_setup:
 	
 	mov	cx,#24
 	mov	bx,#0x0007		! page 0, attribute 7 (normal)
-	mov	bp,#msg1
+	mov	bp,#msg1		; 在屏幕上输出 Loading system ...
 	mov	ax,#0x1301		! write string, move cursor
 	int	0x10
 

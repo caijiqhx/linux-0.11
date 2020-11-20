@@ -12,16 +12,15 @@
  * the page directory.
  */
 .text
-.globl idt,gdt,pg_dir,tmp_floppy_area
-pg_dir:
-.globl startup_32
+.globl _idt,_gdt,_pg_dir,_tmp_floppy_area
+_pg_dir:
 startup_32:
 	movl $0x10,%eax
 	mov %ax,%ds
 	mov %ax,%es
 	mov %ax,%fs
 	mov %ax,%gs
-	lss stack_start,%esp
+	lss _stack_start,%esp		; 将内存低字传送给 16 位寄存器，把高字传给相应的段寄存器 lds/les/lfs/lgs/lss mem, reg
 	call setup_idt
 	call setup_gdt
 	movl $0x10,%eax		# reload all the segment registers
@@ -29,8 +28,8 @@ startup_32:
 	mov %ax,%es		# reloaded in 'setup_gdt'
 	mov %ax,%fs
 	mov %ax,%gs
-	lss stack_start,%esp
-	xorl %eax,%eax
+	lss _stack_start,%esp
+	xorl %eax,%eax	; 检验 A20 地址线是否打开 往 0x000000 写值，跟 0x100000 比较，如果相等就一直比较下去，即死机
 1:	incl %eax		# check that A20 really IS enabled
 	movl %eax,0x000000	# loop forever if it isn't
 	cmpl %eax,0x100000
@@ -78,16 +77,16 @@ check_x87:
  *  written by the page tables.
  */
 setup_idt:
-	lea ignore_int,%edx
+	lea ignore_int,%edx			
 	movl $0x00080000,%eax
 	movw %dx,%ax		/* selector = 0x0008 = cs */
 	movw $0x8E00,%dx	/* interrupt gate - dpl=0, present */
 
-	lea idt,%edi
+	lea _idt,%edi
 	mov $256,%ecx
-rp_sidt:
-	movl %eax,(%edi)
-	movl %edx,4(%edi)
+rp_sidt:					; 参考中断描述符格式
+	movl %eax,(%edi) 		; eax : 0008, low(ignore_int)
+	movl %edx,4(%edi)		; eax : high(ignore_int), 8E00
 	addl $8,%edi
 	dec %ecx
 	jne rp_sidt
@@ -131,15 +130,15 @@ pg3:
  * reach to a buffer-block. It needs to be aligned, so that it isn't
  * on a 64kB border.
  */
-tmp_floppy_area:
+_tmp_floppy_area:
 	.fill 1024,1,0
 
 after_page_tables:
-	pushl $0		# These are the parameters to main :-)
-	pushl $0
-	pushl $0
+	pushl $0		# These are the parameters to main :-) 	; envp
+	pushl $0												; argv				
+	pushl $0												; argc					
 	pushl $L6		# return address for main, if it decides to.
-	pushl $main
+	pushl $_main	
 	jmp setup_paging
 L6:
 	jmp L6			# main should never return here, but
@@ -161,7 +160,7 @@ ignore_int:
 	mov %ax,%es
 	mov %ax,%fs
 	pushl $int_msg
-	call printk
+	call _printk
 	popl %eax
 	pop %fs
 	pop %es
@@ -201,16 +200,17 @@ setup_paging:
 	movl $1024*5,%ecx		/* 5 pages - pg_dir+4 page tables */
 	xorl %eax,%eax
 	xorl %edi,%edi			/* pg_dir is at 0x000 */
-	cld;rep;stosl
-	movl $pg0+7,pg_dir		/* set present bit/user r/w */
-	movl $pg1+7,pg_dir+4		/*  --------- " " --------- */
-	movl $pg2+7,pg_dir+8		/*  --------- " " --------- */
-	movl $pg3+7,pg_dir+12		/*  --------- " " --------- */
+	cld						; 前 5 页置 0
+	rep stosl				; stosl 将 eax 的值保存到 es:edi 处，edi += 4
+	movl $pg0+7,_pg_dir		/* set present bit/user r/w */
+	movl $pg1+7,_pg_dir+4		/*  --------- " " --------- */
+	movl $pg2+7,_pg_dir+8		/*  --------- " " --------- */
+	movl $pg3+7,_pg_dir+12		/*  --------- " " --------- */
 	movl $pg3+4092,%edi
 	movl $0xfff007,%eax		/*  16Mb - 4096 + 7 (r/w user,p) */
-	std
+	std				; 最后一个页表项指向 16 M 的最末 4KB
 1:	stosl			/* fill pages backwards - more efficient :-) */
-	subl $0x1000,%eax
+	subl $0x1000,%eax		; 从后往前一直重复
 	jge 1b
 	xorl %eax,%eax		/* pg_dir is at 0x0000 */
 	movl %eax,%cr3		/* cr3 - page directory start */
@@ -223,17 +223,17 @@ setup_paging:
 .word 0
 idt_descr:
 	.word 256*8-1		# idt contains 256 entries
-	.long idt
+	.long _idt
 .align 2
 .word 0
 gdt_descr:
 	.word 256*8-1		# so does gdt (not that that's any
-	.long gdt		# magic number, but it works for me :^)
+	.long _gdt		# magic number, but it works for me :^)
 
-	.align 8
-idt:	.fill 256,8,0		# idt is uninitialized
+	.align 3
+_idt:	.fill 256,8,0		# idt is uninitialized
 
-gdt:	.quad 0x0000000000000000	/* NULL descriptor */
+_gdt:	.quad 0x0000000000000000	/* NULL descriptor */
 	.quad 0x00c09a0000000fff	/* 16Mb */
 	.quad 0x00c0920000000fff	/* 16Mb */
 	.quad 0x0000000000000000	/* TEMPORARY - don't use */
