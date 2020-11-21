@@ -19,6 +19,16 @@ __asm__ ("movl %%esp,%%eax\n\t" \
 
 #define iret() __asm__ ("iret"::)
 
+// 设置门描述符 
+// 根据中断或异常处理程序偏移地址 addr、门描述符类型 type 和特权级信息 dpl
+// 设置位于 gate_addr 处的门描述符
+// %0 由 dpl, type 组成的标识字
+// %1 描述符低 4 bytes 地址
+// %2 描述符高 4 bytes 地址
+// edx 偏移地址 addr
+// eax 高字含有段选择符 0x8
+// 最后要使 eax : 0008, low(addr); edx : high(addr), 1<<15+dpl<<13+type<<8
+
 #define _set_gate(gate_addr,type,dpl,addr) \
 __asm__ ("movw %%dx,%%ax\n\t" \
 	"movw %0,%%dx\n\t" \

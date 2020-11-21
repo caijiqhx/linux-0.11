@@ -49,16 +49,17 @@ void do_rd_request(void)
 /*
  * Returns amount of memory which needs to be reserved.
  */
+// 返回内存虚拟盘所需的内存量
 long rd_init(long mem_start, int length)
 {
 	int	i;
 	char	*cp;
 
-	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST;
+	blk_dev[MAJOR_NR].request_fn = DEVICE_REQUEST; // 设置虚拟盘设备的请求项处理函数指针指向 do_rd_request
 	rd_start = (char *) mem_start;
 	rd_length = length;
 	cp = rd_start;
-	for (i=0; i < length; i++)
+	for (i=0; i < length; i++)						// 虚拟盘区清零
 		*cp++ = '\0';
 	return(length);
 }

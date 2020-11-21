@@ -42,9 +42,10 @@ struct request {
 ((s1)->dev < (s2)->dev || ((s1)->dev == (s2)->dev && \
 (s1)->sector < (s2)->sector))))
 
-struct blk_dev_struct {
-	void (*request_fn)(void);
-	struct request * current_request;
+// 块设备结构
+struct blk_dev_struct {	
+	void (*request_fn)(void);			// 请求操作的函数指针
+	struct request * current_request;	// 当前正在处理的请求信息结构
 };
 
 extern struct blk_dev_struct blk_dev[NR_BLK_DEV];
