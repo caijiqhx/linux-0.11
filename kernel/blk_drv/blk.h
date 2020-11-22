@@ -21,15 +21,15 @@
  * read/write completion.
  */
 struct request {
-	int dev;		/* -1 if no request */
-	int cmd;		/* READ or WRITE */
-	int errors;
-	unsigned long sector;
-	unsigned long nr_sectors;
-	char * buffer;
-	struct task_struct * waiting;
-	struct buffer_head * bh;
-	struct request * next;
+	int dev;		/* -1 if no request */	// 发请求的设备号
+	int cmd;		/* READ or WRITE */	
+	int errors;								// 操作时产生的错误次数
+	unsigned long sector;					// 起始扇区（1块 = 2 扇区）
+	unsigned long nr_sectors;				// 读/写扇区数
+	char * buffer;							// 数据缓冲区
+	struct task_struct * waiting;			// 任务等待操作执行完成的地方
+	struct buffer_head * bh;				// 缓冲区头指针
+	struct request * next;					// 指向下一个请求项
 };
 
 /*

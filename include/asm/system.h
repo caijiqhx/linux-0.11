@@ -59,6 +59,11 @@ __asm__ ("movw %%dx,%%ax\n\t" \
 	*((gate_addr)+1) = (((base) & 0x0000ffff)<<16) | \
 		((limit) & 0x0ffff); }
 
+// 按照段描述符的格式拼接数据
+// base[31:24] G D/B 0 AVL limit[19:16]
+// P DPL/2 S type/4 base[23:16]
+// base[15:0]
+// limit[15:0]
 #define _set_tssldt_desc(n,addr,type) \
 __asm__ ("movw $104,%1\n\t" \
 	"movw %%ax,%2\n\t" \

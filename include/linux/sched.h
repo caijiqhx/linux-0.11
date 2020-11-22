@@ -50,6 +50,7 @@ struct i387_struct {
 	long	st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
 };
 
+// Task State Segment	任务状态段数据结构是操作系统在进行进程切换时保存进程现场信息的段
 struct tss_struct {
 	long	back_link;	/* 16 high bits zero */
 	long	esp0;
@@ -79,33 +80,33 @@ struct tss_struct {
 
 struct task_struct {
 /* these are hardcoded - don't touch */
-	long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
-	long counter;
-	long priority;
-	long signal;
-	struct sigaction sigaction[32];
-	long blocked;	/* bitmap of masked signals */
+	long state;	/* -1 unrunnable, 0 runnable, >0 stopped */		// 运行状态
+	long counter;												// 运行时间片
+	long priority;												// 运行优先级，开始运行时 counter = priority，越大运行时间越长
+	long signal;												// 信号，位图，每一位代表一种信号，信号值 = 位偏移值 + 1
+	struct sigaction sigaction[32];								// 信号执行属性结构，对应信号将要执行的操作和标志信息
+	long blocked;	/* bitmap of masked signals */				// 进程信号屏蔽码，对应信号位图
 /* various fields */
-	int exit_code;
-	unsigned long start_code,end_code,end_data,brk,start_stack;
-	long pid,father,pgrp,session,leader;
-	unsigned short uid,euid,suid;
-	unsigned short gid,egid,sgid;
-	long alarm;
-	long utime,stime,cutime,cstime,start_time;
-	unsigned short used_math;
+	int exit_code;												// 任务执行停止的退出码，父进程有用
+	unsigned long start_code,end_code,end_data,brk,start_stack;	// 代码段地址、代码长度、代码+数据长度、总长度、堆栈段地址
+	long pid,father,pgrp,session,leader;						// 进程号、父进程号、进程组号、会话号、会话首领
+	unsigned short uid,euid,suid;								// 用户 id、有效用户 id、保存的用户 id
+	unsigned short gid,egid,sgid;								// 组 id、有效组 id、保存的组 id
+	long alarm;													// 报警定时值
+	long utime,stime,cutime,cstime,start_time;					// 用户态运行时间、内核态运行时间、子进程用户态运行时间、子进程内核态运行时间、进程开始运行时刻
+	unsigned short used_math;									// 标志是否使用了协处理器
 /* file system info */
-	int tty;		/* -1 if no tty, so it must be signed */
-	unsigned short umask;
-	struct m_inode * pwd;
-	struct m_inode * root;
-	struct m_inode * executable;
-	unsigned long close_on_exec;
-	struct file * filp[NR_OPEN];
+	int tty;		/* -1 if no tty, so it must be signed */	// 进程使用 tty 的子设备号，-1 表示没有使用。
+	unsigned short umask;										// 文件创建属性掩码
+	struct m_inode * pwd;										// 当前工作目录 i 节点结构
+	struct m_inode * root;										// 根目录 i 节点结构
+	struct m_inode * executable;								// 执行文件 i 节点结构
+	unsigned long close_on_exec;								// 执行时关闭文件句柄位图标志
+	struct file * filp[NR_OPEN];								// 进程使用的文件表结构
 /* ldt for this task 0 - zero 1 - cs 2 - ds&ss */
-	struct desc_struct ldt[3];
+	struct desc_struct ldt[3];									// 本任务的局部表描述符，0-空，1-代码段 cs，2-数据和堆栈段 ds&ss
 /* tss for this task */
-	struct tss_struct tss;
+	struct tss_struct tss;										// 本进程的任务状态段信息结构
 };
 
 /*

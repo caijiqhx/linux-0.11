@@ -60,7 +60,7 @@ extern int system_call(void);           // 系统调用中断处理程序
 
 // 每个任务(进程)在内核态运行时都有自己的内核态堆栈。这里定义了任务的内核态堆栈结构。
 // 定义任务联合(任务结构成员和stack字符数组成员)。因为一个任务的数据结构与其内核态堆栈
-// 在同一内存页中，所以从堆栈段寄存器ss可以获得其数据端选择符。
+// 在同一内存页中，所以从堆栈段寄存器ss可以获得其数据段选择符。
 union task_union {
 	struct task_struct task;
 	char stack[PAGE_SIZE];
@@ -558,7 +558,7 @@ void sched_init(void)
     // FIRST_TSS_ENTRY和FIRST_LDT_ENTRY的值分别是4和5，定义在include/linux/sched.h
     // 中；gdt是一个描述符表数组(include/linux/head.h)，实际上对应程序head.s中
     // 全局描述符表基址（_gdt）.因此gtd+FIRST_TSS_ENTRY即为gdt[FIRST_TSS_ENTRY](即为gdt[4]),
-    // 也即gdt数组第4项的地址。
+    // 也即gdt数组第4项的地址。在 head.s 中已经设置了 gdt 0~3 项的值。
 	set_tss_desc(gdt+FIRST_TSS_ENTRY,&(init_task.task.tss));
 	set_ldt_desc(gdt+FIRST_LDT_ENTRY,&(init_task.task.ldt));
     // 清任务数组和描述符表项(注意 i=1 开始，所以初始任务的描述符还在)。描述符项结构
