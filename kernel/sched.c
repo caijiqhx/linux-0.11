@@ -581,8 +581,8 @@ void sched_init(void)
     // 输出引脚接在中断控制主芯片的IRQ0上，它每10毫秒发出一个IRQ0请求。LATCH是初始
     // 定时计数值。
 	outb_p(0x36,0x43);		/* binary, mode 3, LSB/MSB, ch 0 */
-	outb_p(LATCH & 0xff , 0x40);	/* LSB */
-	outb(LATCH >> 8 , 0x40);	/* MSB */
+	outb_p(LATCH & 0xff , 0x40);	/* LSB */	// 定时值低字节
+	outb(LATCH >> 8 , 0x40);		/* MSB */	// 定时值高字节
     // 设置时钟中断处理程序句柄(设置时钟中断门)。修改中断控制器屏蔽码，允许时钟中断。
     // 然后设置系统调用中断门。这两个设置中断描述符表IDT中描述符在宏定义在文件
     // include/asm/system.h中。
