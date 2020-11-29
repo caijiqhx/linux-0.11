@@ -1,13 +1,16 @@
+// 移动到用户模式运行
+// 利用 iret 指令实现从内核模式移动到初始任务 0 中执行
+// LDT 在 include/linux/sched.h INIT_TASK 处已经定义
 #define move_to_user_mode() \
-__asm__ ("movl %%esp,%%eax\n\t" \
-	"pushl $0x17\n\t" \
-	"pushl %%eax\n\t" \
-	"pushfl\n\t" \
-	"pushl $0x0f\n\t" \
-	"pushl $1f\n\t" \
-	"iret\n" \
-	"1:\tmovl $0x17,%%eax\n\t" \
-	"movw %%ax,%%ds\n\t" \
+__asm__ ("movl %%esp,%%eax\n\t" \		// 保存 esp
+	"pushl $0x17\n\t" \					// ss 入栈, 00010111b 段选择符, [1:0] 表示特权级 3, [2] 表示 LDT[2]
+	"pushl %%eax\n\t" \					// esp
+	"pushfl\n\t" \						// eflags
+	"pushl $0x0f\n\t" \					// cs 入栈, 00001111b 段选择符, [1:0] 表示特权级 3, [2] 表示 LDT[1]
+	"pushl $1f\n\t" \					// eip 入栈，1f 即表示下面标号 1 的偏移地址
+	"iret\n" \							// 执行 iret 后就会跳转都标号 1 处
+	"1:\tmovl $0x17,%%eax\n\t" \		// 此处开始执行任务 0
+	"movw %%ax,%%ds\n\t" \				// 将 ds,es,fs,gs 都设置为跟 ss 一样
 	"movw %%ax,%%es\n\t" \
 	"movw %%ax,%%fs\n\t" \
 	"movw %%ax,%%gs" \

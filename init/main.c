@@ -154,7 +154,7 @@ void main(void)		/* This really IS void, no error here. */
     // 根设备号 ->ROOT_DEV；高速缓存末端地址->buffer_memory_end;
     // 机器内存数->memory_end；主内存开始地址->main_memory_start；
     // 其中ROOT_DEV已在前面包含进的fs.h文件中声明为extern int
- 	ROOT_DEV = ORIG_ROOT_DEV;
+ 	ROOT_DEV = ORIG_ROOT_DEV;		// include/linux/fs.h
  	drive_info = DRIVE_INFO;        // 复制0x90080处的硬盘参数
 	memory_end = (1<<20) + (EXT_MEM_K<<10);     // 内存大小=1Mb + 扩展内存(k)*1024 byte
 	memory_end &= 0xfffff000;                   // 忽略不到4kb(1页)的内存数
