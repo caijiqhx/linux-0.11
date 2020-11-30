@@ -29,16 +29,31 @@
 // Linux在内核空间创建进程时不使用写时复制技术(Copy on write).main()在移动到用户
 // 模式（到任务0）后执行内嵌方式的fork()和pause(),因此可保证不适用任务0的用户栈。
 // 在执行moveto_user_mode()之后，本程序main()就以任务0的身份在运行了。而任务0是
-// 所有将将创建子进程的父进程。当它创建ygie子进程时(init进程)，由于任务1代码属于
+// 所有将将创建子进程的父进程。当它创建一个子进程时(init进程)，由于任务1代码属于
 // 内核空间，因此没有使用写时复制功能。此时任务0的用户栈就是任务1的用户栈，即它们
 // 共同使用一个栈空间。因此希望在main.c运行在任务0的环境下不要有对堆栈的任何操作，
 // 以免弄乱堆栈。而在再次执行fork()并执行过execve()函数后，被加载程序已不属于内核空间
 // 因此可以使用写时复制技术了。
 //
-// 下面_syscall0()是unistd.h中的内嵌宏代码。以嵌入汇编的形式调用Linux的系统调用中断
-// 0x80.该中断是所有系统调用的入口。该条语句实际上是int fork()创建进程系统调用。可展
-// 开看之就会立刻明白。syscall0名称中最后的0表示无参数，1表示1个参数。
+// 下面_syscall0()是 include/unistd.h 中的内嵌宏代码。
+// 以嵌入汇编的形式调用Linux的系统调用中断 0x80, 该中断是所有系统调用的入口。
+// syscalln 表示有 n 个参数的系统调用
+// int fork() 系统调用，创建子进程
 static inline _syscall0(int,fork)
+/* 
+// 展开的代码
+int fork(void) 
+{
+	long __res;
+	__asm__ volatile ("int $0x80"		// 系统调用入口
+		: "=a" (__res)					// 返回值赋给 eax
+		: "0" (__NR_fork));				// 传入 fork 系统调用号, "0" 表示同上寄存器
+	if(__res >= 0)						// int 0x80 返回地址
+		return (int) __res;
+	errno = -__res;
+	return -1;
+}
+ */
 // int pause() 系统调用，暂停进程的执行，直到收到一个信号
 static inline _syscall0(int,pause)
 // int setup(void * BIOS)系统调用，仅用于linux初始化(仅在这个程序中被调用)
