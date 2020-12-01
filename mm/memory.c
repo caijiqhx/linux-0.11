@@ -82,7 +82,7 @@ static unsigned char mem_map [ PAGING_PAGES ] = {0,};
  * Get physical address of first (actually last :-) free page, and mark it
  * used. If no free pages left, return 0.
  */
-//// 在主内存区中取空闲屋里页面。如果已经没有可用物理内存页面，则返回0.
+//// 在主内存区中取空闲物理页面。如果已经没有可用物理内存页面，则返回0.
 // 输入：%1(ax=0) - 0; %2(LOW_MEM)内存字节位图管理的其实位置；%3(cx=PAGING_PAGES);
 // %4(edi=mem_map+PAGING_PAGES-1).
 // 输出：返回%0(ax=物理内存页面起始地址)。
@@ -96,21 +96,21 @@ unsigned long get_free_page(void)
 {
 register unsigned long __res asm("ax");
 
-__asm__("std ; repne ; scasb\n\t"   // 置方向位，al(0)与对应每个页面的(di)内容比较
-	"jne 1f\n\t"                    // 如果没有等于0的字节，则跳转结束(返回0).
-	"movb $1,1(%%edi)\n\t"          // 1 => [1+edi],将对应页面内存映像bit位置1.
-	"sall $12,%%ecx\n\t"            // 页面数*4k = 相对页面其实地址
-	"addl %2,%%ecx\n\t"             // 再加上低端内存地址，得页面实际物理起始地址
-	"movl %%ecx,%%edx\n\t"          // 将页面实际其实地址->edx寄存器。
+__asm__("std ; repne ; scasb\n\t"   // std 置方向位, 从高到低扫描; repne 重复执行直到 ecx==0 或 ZF==0; scasb 比较 al 和 [edi]
+	"jne 1f\n\t"                    // 如果 mem_map 没有空闲，则退出。
+	"movb $1,1(%%edi)\n\t"          // 1 => [1+edi], mem_map 找到的第一个空闲设为 1, +1 是因为 scasb 会 dec edi
+	"sall $12,%%ecx\n\t"            // 相对 LOW_MEM 的页面地址
+	"addl %2,%%ecx\n\t"             // 加上 LOW_MEM, 实际物理地址
+	"movl %%ecx,%%edx\n\t"
 	"movl $1024,%%ecx\n\t"          // 寄存器ecx置计数值1024
-	"leal 4092(%%edx),%%edi\n\t"    // 将4092+edx的位置->dei（该页面的末端地址）
-	"rep ; stosl\n\t"               // 将edi所指内存清零(反方向，即将该页面清零)
-	"movl %%edx,%%eax\n"            // 将页面起始地址->eax（返回值）
+	"leal 4092(%%edx),%%edi\n\t"    // 页面末端地址 => edi
+	"rep ; stosl\n\t"               // eax => [edi], 清空页面
+	"movl %%edx,%%eax\n"            // 页面起始地址 => eax
 	"1:"
 	:"=a" (__res)
 	:"0" (0),"i" (LOW_MEM),"c" (PAGING_PAGES),
 	"D" (mem_map+PAGING_PAGES-1)
-	);
+	:"di","cx","dx");				// 程序中改变过的寄存器
 return __res;           // 返回空闲物理页面地址(若无空闲页面则返回0).
 }
 
@@ -218,7 +218,7 @@ int free_page_tables(unsigned long from,unsigned long size)
 // 复制指定线性地址和长度内存对应的页目录项和页表项，从而被复制的页目录和页表对
 // 应的原物理内存页面区被两套页表映射而共享使用。复制时，需申请新页面来存放新页
 // 表，原物理内存区将被共享。此后两个进程（父进程和其子进程）将共享内存区，直到
-// 有一个进程执行谢操作时，内核才会为写操作进程分配新的内存页(写时复制机制)。
+// 有一个进程执行写操作时，内核才会为写操作进程分配新的内存页(写时复制机制)。
 // 参数from、to是线性地址，size是需要复制（共享）的内存长度，单位是byte.
 int copy_page_tables(unsigned long from,unsigned long to,long size)
 {
@@ -236,6 +236,8 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
     // 算要复制的内存块占用的页表数(即目录项数)。
 	if ((from&0x3fffff) || (to&0x3fffff))
 		panic("copy_page_tables called with wrong alignment");
+	// 页目录表项在页目录表中的偏移地址，一项对应 4MB，所以偏移地址还要 4B 对齐 
+	// 感觉就相当于 (addr>>22)<<2，如果是 4M 对齐那应该就不用与 0xffc ?
 	from_dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
 	to_dir = (unsigned long *) ((to>>20) & 0xffc);
 	size = ((unsigned) (size+0x3fffff)) >> 22;
@@ -244,7 +246,7 @@ int copy_page_tables(unsigned long from,unsigned long to,long size)
     // 且开始页表项复制操作。如果目的目录指定的页表已经存在(P=1)，则出错死机。
     // 如果源目录项无效，即指定的页表不存在(P=1),则继续循环处理下一个页目录项。
 	for( ; size-->0 ; from_dir++,to_dir++) {
-		if (1 & *to_dir)
+		if (1 & *to_dir)			// 页表项最低位为存在位
 			panic("copy_page_tables: already exist");
 		if (!(1 & *from_dir))
 			continue;

@@ -110,10 +110,10 @@ int copy_mem(int nr,struct task_struct * p)
 // 2. 在刚进入system_call时压入栈的段寄存器ds、es、fs和edx、ecx、ebx；
 // 3. 调用sys_call_table中sys_fork函数时压入栈的返回地址(用参数none表示)；
 // 4. 在调用copy_process()分配任务数组项号。
-int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
-		long ebx,long ecx,long edx,
-		long fs,long es,long ds,
-		long eip,long cs,long eflags,long esp,long ss)
+int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,	// call instruction and after find_empty_process
+		long ebx,long ecx,long edx,										// system_call
+		long fs,long es,long ds,										// system_call
+		long eip,long cs,long eflags,long esp,long ss)					// hardware
 {
 	struct task_struct *p;
 	int i;
@@ -127,30 +127,31 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	if (!p)
 		return -EAGAIN;
 	task[nr] = p;
+	// 注意此处的数据类型, 仅复制了 task_struct 而未复制 stack
 	*p = *current;	/* NOTE! this doesn't copy the supervisor stack */
     // 随后对复制来的进程结构内容进行一些修改，作为新进程的任务结构。先将
     // 进程的状态置为不可中断等待状态，以防止内核调度其执行。然后设置新进程
     // 的进程号pid和父进程号father，并初始化进程运行时间片值等于其priority值
     // 接着复位新进程的信号位图、报警定时值、会话(session)领导标志leader、进程
     // 及其子进程在内核和用户态运行时间统计值，还设置进程开始运行的系统时间start_time.
-	p->state = TASK_UNINTERRUPTIBLE;
-	p->pid = last_pid;              // 新进程号。也由find_empty_process()得到。
+	p->state = TASK_UNINTERRUPTIBLE;	// 不可中断等待状态
+	p->pid = last_pid;              // find_empty_process 分配的 pid
 	p->father = current->pid;       // 设置父进程
 	p->counter = p->priority;       // 运行时间片值
 	p->signal = 0;                  // 信号位图置0
 	p->alarm = 0;                   // 报警定时值(滴答数)
 	p->leader = 0;		/* process leadership doesn't inherit */
-	p->utime = p->stime = 0;        // 用户态时间和和心态运行时间
-	p->cutime = p->cstime = 0;      // 子进程用户态和和心态运行时间
+	p->utime = p->stime = 0;        // 用户态时间和和内核态运行时间
+	p->cutime = p->cstime = 0;      // 子进程用户态和和内核态运行时间
 	p->start_time = jiffies;        // 进程开始运行时间(当前时间滴答数)
     // 再修改任务状态段TSS数据，由于系统给任务结构p分配了1页新内存，所以(PAGE_SIZE+
     // (long)p)让esp0正好指向该页顶端。ss0:esp0用作程序在内核态执行时的栈。另外，
     // 每个任务在GDT表中都有两个段描述符，一个是任务的TSS段描述符，另一个是任务的LDT
-    // 表描述符。下面语句就是把GDT中本任务LDT段描述符和选择符保存在本任务的TSS段中。
+    // 表描述符。下面语句就是把GDT中本任务LDT段描述符的选择符保存在本任务的TSS段中。
     // 当CPU执行切换任务时，会自动从TSS中把LDT段描述符的选择符加载到ldtr寄存器中。
 	p->tss.back_link = 0;
-	p->tss.esp0 = PAGE_SIZE + (long) p;     // 任务内核态栈指针。
-	p->tss.ss0 = 0x10;                      // 内核态栈的段选择符(与内核数据段相同)
+	p->tss.esp0 = PAGE_SIZE + (long) p;     // 任务内核态栈指针
+	p->tss.ss0 = 0x10;                      // 内核态栈的段选择符(与内核数据段相同), 即 10000b, 对应 GDT[2]
 	p->tss.eip = eip;                       // 指令代码指针
 	p->tss.eflags = eflags;                 // 标志寄存器
 	p->tss.eax = 0;                         // 这是当fork()返回时新进程会返回0的原因所在

@@ -42,6 +42,7 @@ static int reset = 1;
 /*
  *  This struct defines the HD's and their types.
  */
+// 硬盘参数，磁头数、每磁道扇区数、柱面数、写前预补偿柱面号、磁头着陆柱面号、控制字节
 struct hd_i_struct {
 	int head,sect,cyl,wpcom,lzone,ctl;
 	};
@@ -54,8 +55,8 @@ static int NR_HD = 0;
 #endif
 
 static struct hd_struct {
-	long start_sect;
-	long nr_sects;
+	long start_sect;		// 硬盘起始扇区号
+	long nr_sects;			// 硬盘总扇区数
 } hd[5*MAX_HD]={{0,0},};
 
 #define port_read(port,buf,nr) \
@@ -68,6 +69,10 @@ extern void hd_interrupt(void);
 extern void rd_load(void);
 
 /* This may be used only once, enforced by 'static int callable' */
+// 只在初始化时调用一次，用静态变量 callable 作为可调用标志
+// 系统设置函数
+// 参数 BIOS 是 main 函数里初始化的 drive_info 硬盘参数表结构指针，是由 setup.s 程序获取放到内存 0x90080 处
+// 本函数主要是读取 CMOS 和硬盘参数表信息，设置硬盘分区结构 hd，并尝试加载 RAM 虚拟盘和根文件系统
 int sys_setup(void * BIOS)
 {
 	static int callable = 1;
@@ -75,10 +80,12 @@ int sys_setup(void * BIOS)
 	unsigned char cmos_disks;
 	struct partition *p;
 	struct buffer_head * bh;
-
+	// 设置调用标志，控制只调用一次
 	if (!callable)
 		return -1;
 	callable = 0;
+	// 如果在 include/linux/config.h 中定义了 HD_TYPE，则 hd_info 已经设置好
+	// 否则需要读取 setup.s 程序放在内存中 0x90080 处的硬盘参数表
 #ifndef HD_TYPE
 	for (drive=0 ; drive<2 ; drive++) {
 		hd_info[drive].cyl = *(unsigned short *) BIOS;
@@ -87,13 +94,16 @@ int sys_setup(void * BIOS)
 		hd_info[drive].ctl = *(unsigned char *) (8+BIOS);
 		hd_info[drive].lzone = *(unsigned short *) (12+BIOS);
 		hd_info[drive].sect = *(unsigned char *) (14+BIOS);
-		BIOS += 16;
+		BIOS += 16;			// 每个表长 16 字节
 	}
+	// 判断硬盘数
 	if (hd_info[1].cyl)
 		NR_HD=2;
 	else
 		NR_HD=1;
 #endif
+	// 硬盘信息 hd_info 设置好，现在设置硬盘分区结构 hd[]
+	// 数组的 [0] [5] 分别表示两个硬盘的整体参数，[1:4] [6:9] 则表示两个硬盘 4 个分区的参数
 	for (i=0 ; i<NR_HD ; i++) {
 		hd[i*5].start_sect = 0;
 		hd[i*5].nr_sects = hd_info[i].head*
@@ -121,7 +131,6 @@ int sys_setup(void * BIOS)
 
 		
 	*/
-
 	if ((cmos_disks = CMOS_READ(0x12)) & 0xf0)
 		if (cmos_disks & 0x0f)
 			NR_HD = 2;
@@ -133,6 +142,9 @@ int sys_setup(void * BIOS)
 		hd[i*5].start_sect = 0;
 		hd[i*5].nr_sects = 0;
 	}
+	// 到此真正确定了系统中的硬盘个数 NR_HD
+	// 用 bread 读硬盘第一个扇区，读成功则将数据会被存放在缓冲块 bh，还要判断扇区末尾两个字节是否是 0xAA55
+	// 然后验证扇区中 0x1BE 偏移开始处的分区表是否有效，有效则存入 hd[] 中，最后释放缓冲区
 	for (drive=0 ; drive<NR_HD ; drive++) {
 		if (!(bh = bread(0x300 + drive*5,0))) {
 			printk("Unable to read partition table of drive %d\n\r",
@@ -153,8 +165,8 @@ int sys_setup(void * BIOS)
 	}
 	if (NR_HD)
 		printk("Partition table%s ok.\n\r",(NR_HD>1)?"s":"");
-	rd_load();
-	mount_root();
+	rd_load();			// 尝试创建并加载虚拟盘
+	mount_root();		// 安装根文件系统
 	return (0);
 }
 

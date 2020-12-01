@@ -171,13 +171,14 @@ __asm__("str %%ax\n\t" \
  * This also clears the TS-flag if the task we switched to has used
  * tha math co-processor latest.
  */
+// 切换当前进程到进程 n
 #define switch_to(n) {\
 struct {long a,b;} __tmp; \
 __asm__("cmpl %%ecx,current\n\t" \
-	"je 1f\n\t" \
-	"movw %%dx,%1\n\t" \
-	"xchgl %%ecx,current\n\t" \
-	"ljmp *%0\n\t" \
+	"je 1f\n\t" \								// 先检测当前进程不是 n
+	"movw %%dx,%1\n\t" \						// TSS 段选择符存入 tmp.b
+	"xchgl %%ecx,current\n\t" \					// 交换 current = task[n], ecx = 切换出的任务
+	"ljmp *%0\n\t" \							// 跳转到 tmp, a 是偏移, b 是段选择符, 任务门忽略偏移 到这就跳走了
 	"cmpl %%ecx,last_task_used_math\n\t" \
 	"jne 1f\n\t" \
 	"clts\n" \
@@ -218,7 +219,8 @@ __asm__ ("push %%edx\n\t" \
 #define set_base(ldt,base) _set_base( ((char *)&(ldt)) , (base) )
 #define set_limit(ldt,limit) _set_limit( ((char *)&(ldt)) , (limit-1)>>12 )
 
-/**
+// /**
+// 从描述符中拼接段基址
 #define _get_base(addr) ({\
 unsigned long __base; \
 __asm__("movb %3,%%dh\n\t" \
@@ -231,21 +233,21 @@ __asm__("movb %3,%%dh\n\t" \
 	 "m" (*((addr)+7)) \
         :"memory"); \
 __base;})
-**/
+// **/
 
-static inline unsigned long _get_base(char * addr)
-{
-         unsigned long __base;
-         __asm__("movb %3,%%dh\n\t"
-                 "movb %2,%%dl\n\t"
-                 "shll $16,%%edx\n\t"
-                 "movw %1,%%dx"
-                 :"=&d" (__base)
-                 :"m" (*((addr)+2)),
-                  "m" (*((addr)+4)),
-                  "m" (*((addr)+7)));
-         return __base;
-}
+// static inline unsigned long _get_base(char * addr)
+// {
+//          unsigned long __base;
+//          __asm__("movb %3,%%dh\n\t"
+//                  "movb %2,%%dl\n\t"
+//                  "shll $16,%%edx\n\t"
+//                  "movw %1,%%dx"
+//                  :"=&d" (__base)
+//                  :"m" (*((addr)+2)),
+//                   "m" (*((addr)+4)),
+//                   "m" (*((addr)+7)));
+//          return __base;
+// }
 
 #define get_base(ldt) _get_base( ((char *)&(ldt)) )
 

@@ -133,6 +133,7 @@ void math_state_restore()
  * tasks can run. It can not be killed, and it cannot sleep. The 'state'
  * information in task[0] is never used.
  */
+// 任务 0 是闲置任务，只有当没有其他任务可运行时才调度它，它不能被杀死，也不能催眠，state 字段没啥用。
 void schedule(void)
 {
 	int i,next,c;
@@ -160,6 +161,7 @@ void schedule(void)
 
 /* this is the scheduler proper: */
 
+	// 调度的主要部分
 	while (1) {
 		c = -1;
 		next = 0;
