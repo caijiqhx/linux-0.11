@@ -125,7 +125,7 @@ struct task_struct {
 /* filp */	{NULL,}, \
 	{ \
 		{0,0}, \
-/* ldt */	{0x9f,0xc0fa00}, \
+/* ldt */	{0x9f,0xc0fa00}, \ // 0x 00c0 fa00 0000 009f Base = [63:56] << 24 + [39:16] limit = [19:16] << 16 + [15:0] * (G==1) ? 4KB:1B
 		{0x9f,0xc0f200}, \
 	}, \
 /*tss*/	{0,PAGE_SIZE+(long)&init_task,0x10,0,0,0,0,(long)&pg_dir,\

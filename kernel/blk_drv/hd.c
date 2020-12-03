@@ -146,6 +146,7 @@ int sys_setup(void * BIOS)
 	// 用 bread 读硬盘第一个扇区，读成功则将数据会被存放在缓冲块 bh，还要判断扇区末尾两个字节是否是 0xAA55
 	// 然后验证扇区中 0x1BE 偏移开始处的分区表是否有效，有效则存入 hd[] 中，最后释放缓冲区
 	for (drive=0 ; drive<NR_HD ; drive++) {
+		// 0x300, 0x305 是设备号
 		if (!(bh = bread(0x300 + drive*5,0))) {
 			printk("Unable to read partition table of drive %d\n\r",
 				drive);

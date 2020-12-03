@@ -86,6 +86,8 @@ static void add_request(struct blk_dev_struct * dev, struct request * req)
 	sti();
 }
 
+// 创建请求项并插入请求队列中
+// major 设备号, rw 指定命令, 缓冲块头指针
 static void make_request(int major,int rw, struct buffer_head * bh)
 {
 	struct request * req;
@@ -143,10 +145,11 @@ repeat:
 	add_request(major+blk_dev,req);
 }
 
+// 底层读写数据块函数 Low Level Read Write Block
 void ll_rw_block(int rw, struct buffer_head * bh)
 {
 	unsigned int major;
-
+	// 判断缓冲块对应的设备是否存在以及设备请求项函数是否挂接正常
 	if ((major=MAJOR(bh->b_dev)) >= NR_BLK_DEV ||
 	!(blk_dev[major].request_fn)) {
 		printk("Trying to read nonexistent block-device\n\r");
